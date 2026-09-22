@@ -3,40 +3,77 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>岩芯薄片显微照片索引台</title>
+  <title>岩芯薄片色彩校准与跨镜对照台</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <main class="shell">
     <header class="mast">
       <div>
-        <p>Petrographic Slide Index</p>
-        <h1>岩芯薄片显微照片索引台</h1>
+        <p>Petrographic Color Calibration &amp; Cross-Microscope Board</p>
+        <h1>岩芯薄片色彩校准与跨镜对照台</h1>
       </div>
-      <button id="exportBtn" type="button">导出观察清单</button>
+      <button id="exportBtn" type="button">导出校准与对照档案</button>
     </header>
 
     <section class="layout">
-      <form id="sampleForm" class="editor">
-        <h2>样本录入</h2>
-        <label>显微照片<input id="photoInput" type="file" accept="image/*"></label>
-        <label>样本编号<input name="code" required placeholder="BX-17-03"></label>
-        <label>采样地点<input name="location" placeholder="剖面东侧第二层"></label>
-        <div class="pair">
-          <label>放大倍数<input name="magnification" placeholder="40x"></label>
-          <label>偏光类型
-            <select name="polarization">
-              <option>单偏光</option>
-              <option>正交偏光</option>
-              <option>反射光</option>
-            </select>
-          </label>
-        </div>
-        <label>主要矿物<input name="minerals" placeholder="石英、斜长石、黑云母"></label>
-        <label>颗粒结构<input name="texture" placeholder="半自形粒状、碎裂结构"></label>
-        <label>老师批注<textarea name="comment" rows="4" placeholder="记录鉴定依据或疑点"></textarea></label>
-        <button type="submit">保存样本</button>
-      </form>
+      <div class="side">
+        <!-- 入口：样本与校准录入 -->
+        <form id="sampleForm" class="editor">
+          <h2>样本录入</h2>
+          <label>显微照片<input id="photoInput" type="file" accept="image/*"></label>
+          <label>样本编号<input name="code" required placeholder="BX-17-03"></label>
+          <label>采样地点<input name="location" placeholder="剖面东侧第二层"></label>
+          <div class="pair">
+            <label>放大倍数<input name="magnification" placeholder="40x"></label>
+            <label>偏光类型
+              <select name="polarization">
+                <option>单偏光</option>
+                <option>正交偏光</option>
+                <option>反射光</option>
+              </select>
+            </label>
+          </div>
+          <label>主要矿物<input name="minerals" placeholder="石英、斜长石、黑云母"></label>
+          <label>颗粒结构<input name="texture" placeholder="半自形粒状、碎裂结构"></label>
+          <label>老师批注<textarea name="comment" rows="3" placeholder="记录鉴定依据或疑点"></textarea></label>
+
+          <h2 class="sub">校准录入</h2>
+          <div class="pair">
+            <label>显微镜
+              <select name="microscopeId" id="microscopeSelect" required></select>
+            </label>
+            <label>光源批次
+              <select name="lightBatchId" id="lightBatchSelect" required></select>
+            </label>
+          </div>
+          <div class="trio">
+            <label>标准板 R<input name="plateR" type="number" min="0" max="255" required placeholder="200"></label>
+            <label>标准板 G<input name="plateG" type="number" min="0" max="255" required placeholder="200"></label>
+            <label>标准板 B<input name="plateB" type="number" min="0" max="255" required placeholder="200"></label>
+          </div>
+          <label>色温 (K)<input name="colorTemp" type="number" min="1000" max="12000" step="50" required placeholder="5600"></label>
+          <p class="hint">判定规则：任一通道偏差 &gt; 3% 或色温不在 5000–6500K，仅登记「待校色」；同一样品（编号 + 偏光）只保留一条未完成校准，重复或并发录入沿用首次结果。</p>
+          <button type="submit">保存样本并登记校准</button>
+          <p id="entryNotice" class="notice" hidden></p>
+        </form>
+
+        <!-- 入口：设备与光源管理 -->
+        <section class="editor devices">
+          <h2>显微镜与光源</h2>
+          <form id="microscopeForm" class="inline-form">
+            <input name="name" required placeholder="新增显微镜，如 徕卡 DM2700P">
+            <button type="submit">添加</button>
+          </form>
+          <ul id="microscopeList" class="device-list"></ul>
+          <form id="lightBatchForm" class="inline-form">
+            <input name="name" required placeholder="新增光源批次，如 LED-5600K·2026-09">
+            <button type="submit">添加</button>
+          </form>
+          <ul id="lightBatchList" class="device-list"></ul>
+          <p class="hint">仪器报废或换光源后，相关未锁定对照自动失效并重算；已锁定对照保持只读。</p>
+        </section>
+      </div>
 
       <section class="board">
         <div class="filters">
@@ -47,13 +84,23 @@
             <option>正交偏光</option>
             <option>反射光</option>
           </select>
+          <select id="calibrationFilter">
+            <option value="">全部校准状态</option>
+            <option value="passed">合格</option>
+            <option value="pending">待校色</option>
+            <option value="none">未校准</option>
+          </select>
         </div>
         <div id="sampleGrid" class="sample-grid"></div>
       </section>
 
       <aside class="compare">
-        <h2>并排对比</h2>
+        <h2>跨镜对照</h2>
         <div id="comparePane" class="compare-pane"></div>
+        <h2 class="sub">对照记录</h2>
+        <div id="comparisonLedger" class="ledger"></div>
+        <h2 class="sub">校准记录</h2>
+        <div id="calibrationLedger" class="ledger"></div>
       </aside>
     </section>
   </main>
