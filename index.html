@@ -3,60 +3,126 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>岩芯薄片显微照片索引台</title>
+  <title>岩芯薄片色彩校准与跨镜对照台</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <main class="shell">
     <header class="mast">
       <div>
-        <p>Petrographic Slide Index</p>
-        <h1>岩芯薄片显微照片索引台</h1>
+        <p>Color Calibration &amp; Cross-Microscope Comparison</p>
+        <h1>岩芯薄片色彩校准与跨镜对照台</h1>
       </div>
-      <button id="exportBtn" type="button">导出观察清单</button>
+      <button id="exportBtn" type="button">导出台账 JSON</button>
     </header>
 
     <section class="layout">
-      <form id="sampleForm" class="editor">
-        <h2>样本录入</h2>
-        <label>显微照片<input id="photoInput" type="file" accept="image/*"></label>
-        <label>样本编号<input name="code" required placeholder="BX-17-03"></label>
-        <label>采样地点<input name="location" placeholder="剖面东侧第二层"></label>
-        <div class="pair">
-          <label>放大倍数<input name="magnification" placeholder="40x"></label>
-          <label>偏光类型
-            <select name="polarization">
-              <option>单偏光</option>
-              <option>正交偏光</option>
-              <option>反射光</option>
-            </select>
-          </label>
-        </div>
-        <label>主要矿物<input name="minerals" placeholder="石英、斜长石、黑云母"></label>
-        <label>颗粒结构<input name="texture" placeholder="半自形粒状、碎裂结构"></label>
-        <label>老师批注<textarea name="comment" rows="4" placeholder="记录鉴定依据或疑点"></textarea></label>
-        <button type="submit">保存样本</button>
-      </form>
+      <!-- ========== 入口层：样本录入 / 仪器登记 ========== -->
+      <div class="left-col">
+        <form id="sampleForm" class="editor" novalidate>
+          <h2>样本录入 <span class="layer-tag">入口层</span></h2>
+          <label>显微照片<input id="photoInput" type="file" accept="image/*"></label>
+          <div class="pair">
+            <label>样本编号<input name="code" required placeholder="BX-17-03"></label>
+            <label>偏光条件
+              <select name="polarization">
+                <option>单偏光</option>
+                <option>正交偏光</option>
+                <option>反射光</option>
+              </select>
+            </label>
+          </div>
+          <p class="rule-hint">编号 + 偏光条件唯一，重复录入将被驳回。</p>
 
+          <label>绑定显微镜
+            <select name="microscopeId" id="scopeSelect" required></select>
+          </label>
+          <button type="button" id="newScopeToggle" class="ghost-btn">登记新仪器</button>
+          <div id="newScopeForm" class="inline-form" hidden>
+            <input id="newScopeName" placeholder="显微镜名称，如 Olympus BX53-甲">
+            <input id="newBatchLabel" placeholder="首批光源批次，如 LED-2609-A">
+            <button type="button" id="newScopeSave">登记仪器与首批光源</button>
+          </div>
+          <p class="bound-batch" id="boundBatchLine">当前绑定光源批次：—</p>
+
+          <div class="readings">
+            <label>标准板 R<input name="r" type="number" min="1" max="255" step="1" value="255"></label>
+            <label>标准板 G<input name="g" type="number" min="1" max="255" step="1" value="255"></label>
+            <label>标准板 B<input name="b" type="number" min="1" max="255" step="1" value="255"></label>
+          </div>
+          <p class="rule-hint">标准白板基准 255；任一通道偏差 &gt; 3% 即判待校色。</p>
+          <label>光源色温 (K)<input name="colorTemp" type="number" min="2000" max="10000" step="50" value="5500"></label>
+          <p class="rule-hint">允许区间 5000–6500K，区间外只待校色。</p>
+
+          <label>采样地点<input name="location" placeholder="剖面东侧第二层"></label>
+          <div class="pair">
+            <label>放大倍数<input name="magnification" placeholder="40x"></label>
+            <label>主要矿物<input name="minerals" placeholder="石英、斜长石"></label>
+          </div>
+          <label>颗粒结构<input name="texture" placeholder="半自形粒状、碎裂结构"></label>
+          <label>鉴定批注<textarea name="comment" rows="3" placeholder="记录鉴定依据或疑点"></textarea></label>
+          <p id="formMessage" class="form-message" role="status"></p>
+          <button type="submit" class="primary-btn">保存样本</button>
+        </form>
+
+        <section class="kit">
+          <h2>仪器与光源</h2>
+          <p class="rule-hint">换光源或仪器报废会使<strong>未锁定</strong>对照失效并重算；已锁定对照为只读快照。</p>
+          <div id="kitList" class="kit-list"></div>
+        </section>
+      </div>
+
+      <!-- ========== 样本总览（判定结果展示） ========== -->
       <section class="board">
         <div class="filters">
-          <input id="mineralFilter" placeholder="按矿物筛选">
+          <input id="qFilter" placeholder="编号 / 矿物 / 地点关键字">
           <select id="polarFilter">
             <option value="">全部偏光</option>
             <option>单偏光</option>
             <option>正交偏光</option>
             <option>反射光</option>
           </select>
+          <select id="statusFilter">
+            <option value="">全部状态</option>
+            <option value="qualified">合格（免校）</option>
+            <option value="pending">待校色 / 校准中</option>
+            <option value="calibrated">已校色</option>
+          </select>
+          <select id="scopeFilter"><option value="">全部显微镜</option></select>
         </div>
+        <div id="pickBar" class="pick-bar" hidden></div>
         <div id="sampleGrid" class="sample-grid"></div>
       </section>
 
+      <!-- ========== 跨镜对照台 ========== -->
       <aside class="compare">
-        <h2>并排对比</h2>
-        <div id="comparePane" class="compare-pane"></div>
+        <h2>跨镜对照台</h2>
+        <p class="rule-hint">仅合格 / 已校色样本可加入；勾选两张后建立对照。筛选与刷新不改变已选结果。</p>
+        <div id="compareList" class="compare-list"></div>
       </aside>
     </section>
+
+    <!-- ========== 记录层：判定与操作流水 ========== -->
+    <section class="logbook">
+      <div class="logbook-head">
+        <h2>判定与操作记录 <span class="layer-tag">记录层</span></h2>
+        <select id="logTypeFilter">
+          <option value="">全部类型</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>时间</th><th>类型</th><th>对象</th><th>说明</th></tr>
+          </thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
+
+  <script src="./records.js"></script>
+  <script src="./rules.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
